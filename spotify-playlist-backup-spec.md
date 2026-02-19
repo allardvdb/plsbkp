@@ -78,7 +78,7 @@ Create a single-file Python CLI script (`spotify-backup.py`) that can:
 # Set env vars (or put in .env and source it)
 export SPOTIPY_CLIENT_ID="your_client_id"
 export SPOTIPY_CLIENT_SECRET="your_client_secret"
-export SPOTIPY_REDIRECT_URI="http://localhost:8888/callback"
+export SPOTIPY_REDIRECT_URI="http://127.0.0.1:8888/callback"
 
 # List all playlists
 python scripts/spotify-backup.py list
@@ -102,7 +102,7 @@ python scripts/spotify-backup.py import --input today-top-hits.json --name "Top 
 pip install spotipy
 ```
 
-Create a Spotify app at https://developer.spotify.com/dashboard to get client ID and secret. Set redirect URI to `http://localhost:8888/callback` in both the app settings and env var.
+Create a Spotify app at https://developer.spotify.com/dashboard to get client ID and secret. Set redirect URI to `http://127.0.0.1:8888/callback` in both the app settings and env var.
 
 ## File Location
 

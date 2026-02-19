@@ -3,11 +3,17 @@
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 
 import spotipy
 from spotipy.oauth2 import SpotifyPKCE
+
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 
 SCOPES = " ".join([
     "playlist-read-private",
@@ -23,6 +29,7 @@ def get_spotify_client(account=None):
     auth_manager = SpotifyPKCE(
         scope=SCOPES,
         cache_path=cache_path,
+        open_browser=False,
     )
     return spotipy.Spotify(auth_manager=auth_manager)
 
@@ -68,14 +75,14 @@ def export_playlist(sp, playlist_id, output_path):
     user = sp.current_user()
 
     tracks = []
-    results = playlist["tracks"]
+    results = playlist.get("tracks") or playlist["items"]
     position = 0
     total = results["total"]
     print(f"Fetching tracks... 0/{total}", end="", flush=True)
 
     while results:
         for item in results["items"]:
-            track = item.get("track")
+            track = item.get("track") or item.get("item")
             if track is None:
                 position += 1
                 continue
@@ -171,7 +178,20 @@ def import_playlist(sp, input_path, name_override=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Spotify playlist backup/restore tool"
+        description="Spotify playlist backup/restore tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""\
+examples:
+  %(prog)s list                                  List all your playlists
+  %(prog)s export                                Interactive export (pick from menu)
+  %(prog)s export --playlist-id ID -o out.json   Export a specific playlist
+  %(prog)s import --input backup.json            Restore a playlist from backup
+  %(prog)s --account alice export                Use a named account
+
+environment variables (required):
+  SPOTIPY_CLIENT_ID       Spotify app client ID
+  SPOTIPY_CLIENT_SECRET   Spotify app client secret
+  SPOTIPY_REDIRECT_URI    Redirect URI (e.g. http://127.0.0.1:8888/callback)""",
     )
     parser.add_argument("--account", help="Account name (uses separate token cache per account)")
     subparsers = parser.add_subparsers(dest="command")
@@ -188,8 +208,18 @@ def main():
 
     args = parser.parse_args()
 
+    if load_dotenv:
+        load_dotenv()
+
     if not args.command:
         parser.print_help()
+        sys.exit(1)
+
+    missing = [v for v in ("SPOTIPY_CLIENT_ID", "SPOTIPY_REDIRECT_URI")
+               if not os.environ.get(v)]
+    if missing:
+        print(f"Error: missing environment variables: {', '.join(missing)}", file=sys.stderr)
+        print("Set them in your shell or add them to a .env file.", file=sys.stderr)
         sys.exit(1)
 
     sp = get_spotify_client(args.account)
@@ -204,8 +234,19 @@ def main():
 
     elif args.command == "export":
         if args.playlist_id:
-            playlist_id = args.playlist_id
-            output_path = args.output or f"{playlist_id}.json"
+            # If it looks like a list number, resolve it to a real playlist
+            if args.playlist_id.isdigit():
+                idx = int(args.playlist_id) - 1
+                playlists = list_playlists(sp)
+                if idx < 0 or idx >= len(playlists):
+                    print(f"Error: number {args.playlist_id} out of range (1-{len(playlists)})", file=sys.stderr)
+                    sys.exit(1)
+                selected = playlists[idx]
+                playlist_id = selected["id"]
+                output_path = args.output or f"{selected['name']}.json"
+            else:
+                playlist_id = args.playlist_id
+                output_path = args.output or f"{playlist_id}.json"
         else:
             playlists = list_playlists(sp)
             selected = choose_playlist(playlists)

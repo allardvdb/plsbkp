@@ -12,17 +12,22 @@ The tool is a **single-file Python script** (`scripts/spotify-backup.py`) using 
 
 ```bash
 pip install spotipy
+pip install python-dotenv  # optional, enables .env file support
 ```
 
-Requires three environment variables (read automatically by spotipy):
+Uses **PKCE auth** (no client secret required). Requires two environment variables (read automatically by spotipy):
 - `SPOTIPY_CLIENT_ID`
-- `SPOTIPY_CLIENT_SECRET`
-- `SPOTIPY_REDIRECT_URI` (set to `http://localhost:8888/callback`)
+- `SPOTIPY_REDIRECT_URI` (set to `http://127.0.0.1:8888/callback`)
+
+These can be set in the shell or in a `.env` file (loaded automatically when `python-dotenv` is installed).
+
+Auth runs with `open_browser=False` — the user must manually open the auth URL printed to the terminal.
 
 ```bash
 python scripts/spotify-backup.py list                          # list playlists
 python scripts/spotify-backup.py export                        # interactive export
 python scripts/spotify-backup.py export --playlist-id <id> --output <file>
+python scripts/spotify-backup.py export --playlist-id 3        # export by list number
 python scripts/spotify-backup.py import --input <file>         # restore playlist
 python scripts/spotify-backup.py import --input <file> --name "New Name"
 python scripts/spotify-backup.py --account alice export        # multi-account support
@@ -33,12 +38,12 @@ python scripts/spotify-backup.py --account bob import --input <file>
 
 Single file with six functions:
 
-1. `get_spotify_client(account=None)` — OAuth2 init, caches token in `.spotify-token-cache` (or `.spotify-token-cache-<account>` with `--account`)
+1. `get_spotify_client(account=None)` — PKCE OAuth2 init, caches token in `.spotify-token-cache` (or `.spotify-token-cache-<account>` with `--account`)
 2. `list_playlists(sp)` — paginated playlist fetch
 3. `choose_playlist(playlists)` — interactive numbered menu
 4. `export_playlist(sp, playlist_id, output_path)` — paginated track fetch → JSON
 5. `import_playlist(sp, input_path, name_override=None)` — JSON → new playlist, adds tracks in batches of 100
-6. `main()` — argparse with `list`, `export`, `import` subcommands
+6. `main()` — argparse with `list`, `export`, `import` subcommands; validates required env vars on startup; resolves numeric playlist IDs to real Spotify IDs via the list
 
 ## Key Constraints
 
